@@ -54,6 +54,20 @@ pipeline {
                     
                     withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
                         sh """
+                        kubectl apply -f k8s/deployment.yaml -n ${namespace}
+                        kubectl apply -f k8s/service.yaml -n ${namespace}
+                        """
+                    }
+                }
+            }
+        }
+    }
+            steps {
+                script {
+                    def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
+                    
+                    withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
+                        sh """
                         kubectl apply -f k8s_files/deployment.yml -n ${namespace}
                         kubectl apply -f k8s_files/service.yml -n ${namespace}
                         """
