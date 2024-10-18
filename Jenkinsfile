@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    environment {
+        DOCKER_IMAGE = "rafeek123/final_project:${env.BRANCH_NAME}"
+    }
     stages {
         stage('DockerHub Login') {
             steps {
@@ -19,13 +22,13 @@ pipeline {
                         checkout scm: [
                             $class: 'GitSCM',
                             branches: [[name: '*/dev']],
-                            userRemoteConfigs: [[url: 'https://github.com/yourusername/your-repo.git', credentialsId: 'github-credentials']]
+                            userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: 'github-credentials']]
                         ]
                     } else if (env.BRANCH_NAME == 'prod') {
                         checkout scm: [
                             $class: 'GitSCM',
                             branches: [[name: '*/prod']],
-                            userRemoteConfigs: [[url: 'https://github.com/yourusername/your-repo.git', credentialsId: 'github-credentials']]
+                            userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: 'github-credentials']]
                         ]
                     }
                 }
@@ -42,7 +45,8 @@ pipeline {
             }
             steps {
                 script {
-                    def app = docker.build("rafeek123/final_project:${env.BRANCH_NAME}")
+                    // Build the Docker image and assign it to a variable
+                    def app = docker.build(DOCKER_IMAGE)
                 }
             }
         }
@@ -51,6 +55,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerpass') {
+                        // Use the global DOCKER_IMAGE variable here
                         app.push()
                     }
                 }
