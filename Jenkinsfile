@@ -31,6 +31,9 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
+                script {
+                    echo "Attempting to checkout branch: ${env.GIT_BRANCH ?: 'main'}"
+                }
                 git branch: "${env.GIT_BRANCH ?: 'main'}", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
