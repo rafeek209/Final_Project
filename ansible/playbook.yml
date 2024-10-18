@@ -15,6 +15,7 @@
           - ca-certificates
           - curl
           - software-properties-common
+          - python3-venv
         state: present
 
     - name: Add Docker's official GPG key
@@ -36,13 +37,39 @@
         name: docker-ce
         state: present
 
+    - name: Install Python3-pip
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Create a Python virtual environment for Docker SDK
+      command: python3 -m venv /opt/docker-env
+      args:
+        creates: /opt/docker-env
+
+    - name: Install Python Docker SDK in the virtual environment
+      command: /opt/docker-env/bin/pip install docker
+      args:
+        executable: /bin/bash
+
+    - name: Add Jenkins user to the Docker group
+      user:
+        name: jenkins
+        group: docker
+        append: yes
+
+    - name: Stop and remove previous Jenkins container if exists
+      docker_container:
+        name: jenkins
+        state: absen
+
     - name: Pull Jenkins Docker image
       docker_image:
         name: jenkins/jenkins
         tag: lts
         source: pull
 
-    - name: Run Jenkins container
+    - name: Run Jenkins container with Docker socket mounted
       docker_container:
         name: jenkins
         image: jenkins/jenkins:lts
@@ -50,12 +77,14 @@
         restart_policy: always
         published_ports:
           - "8080:8080"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
 
     - name: Wait for Jenkins to start
       wait_for:
         port: 8080
         delay: 10
-        timeout: 60
+        timeout: 120
 
     - name: Get Jenkins initial password
       command: "docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword"
