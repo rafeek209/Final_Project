@@ -34,6 +34,7 @@ pipeline {
                 script {
                     echo "Attempting to checkout branch: ${env.GIT_BRANCH ?: 'main'}"
                 }
+                // Ensure the branch is set correctly
                 git branch: "${env.GIT_BRANCH ?: 'main'}", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
