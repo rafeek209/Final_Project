@@ -1,14 +1,29 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_CREDENTIALS_ID = 'your-docker-credentials-id' // Replace with your DockerHub credentials ID
+        GITHUB_CREDENTIALS_ID = 'your-github-credentials-id' // Replace with your GitHub credentials ID
+        DOCKER_IMAGE = "rafeek123/final_project"
+        NAMESPACE = 'dev' // Change to 'prod' for production deployments
+    }
+
     stages {
+        stage('Checkout SCM') {
+            steps {
+                script {
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: "${GITHUB_CREDENTIALS_ID}"]]])
+                }
+            }
+        }
+
         stage('DockerHub Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerpass', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    sh '''
-                        echo "Logging in to DockerHub with user: $USERNAME"
-                        echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
-                    '''
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    script {
+                        echo "Logging in to DockerHub with user: ${USERNAME}"
+                        sh "echo \$PASSWORD | docker login -u \$USERNAME --password-stdin"
+                    }
                 }
             }
         }
@@ -16,10 +31,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    def branch = env.BRANCH_NAME
-                    def imageName = "rafeek123/final_project:${branch == 'main' ? 'prod' : 'dev'}"
-                    echo "Building Docker image: $imageName"
-                    sh "docker build -t ${imageName} ."
+                    echo "Building Docker image: ${DOCKER_IMAGE}:dev"
+                    sh "docker build -t ${DOCKER_IMAGE}:dev ."
                 }
             }
         }
@@ -27,30 +40,19 @@ pipeline {
         stage('Push Docker Image to DockerHub') {
             steps {
                 script {
-                    def branch = env.BRANCH_NAME
-                    def imageName = "rafeek123/final_project:${branch == 'main' ? 'prod' : 'dev'}"
-                    echo "Pushing Docker image: $imageName"
-                    sh "docker push ${imageName}"
+                    echo "Pushing Docker image: ${DOCKER_IMAGE}:dev"
+                    sh "docker push ${DOCKER_IMAGE}:dev"
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
-            agent {
-                docker {
-                    image 'bitnami/kubectl:latest'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock --entrypoint=""' // Disable entrypoint to run commands directly
-                }
-            }
             steps {
                 script {
-                    def branch = env.BRANCH_NAME
-                    def namespace = branch == 'main' ? 'prod' : 'dev'
-                    echo "Deploying to Kubernetes namespace: $namespace"
-                    sh '''
-                        kubectl apply -f k8s_file/deployment-${namespace}.yaml -n ${namespace}
-                        kubectl apply -f k8s_file/service-${namespace}.yaml -n ${namespace}
-                    '''
+                    echo "Deploying to Kubernetes namespace: ${NAMESPACE}"
+                    // Apply deployment and service files for the dev environment
+                    sh "kubectl apply -f k8s_file/deployment-${NAMESPACE}.yaml -n ${NAMESPACE}"
+                    sh "kubectl apply -f k8s_file/service-${NAMESPACE}.yaml -n ${NAMESPACE}"
                 }
             }
         }
@@ -58,11 +60,16 @@ pipeline {
 
     post {
         always {
-            echo "Cleaning up..."
-            sh '''
-                docker system prune -f
-            '''
-            echo "Build completed: ${env.BUILD_ID}"
+            script {
+                echo "Cleaning up..."
+                sh "docker system prune -f"
+            }
+        }
+        success {
+            echo "Build completed successfully!"
+        }
+        failure {
+            echo "Build failed."
         }
     }
 }
