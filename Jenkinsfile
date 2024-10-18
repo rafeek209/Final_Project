@@ -21,9 +21,17 @@ pipeline {
             }
         }
 
+        stage('Log Branch Name') {
+            steps {
+                script {
+                    echo "Current GIT_BRANCH: ${env.GIT_BRANCH ?: 'main'}"
+                }
+            }
+        }
+
         stage('Checkout Code') {
             steps {
-                git branch: "${env.GIT_BRANCH}", url: 'https://github.com/rafeek209/Final_Project.git'
+                git branch: "${env.GIT_BRANCH ?: 'main'}", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
