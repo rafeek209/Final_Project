@@ -1,42 +1,73 @@
-# Final Project: DevOps Automation on AWS
 
-## Project Overview
-This project demonstrates the integration of various DevOps tools and practices, including Terraform, Ansible, Docker, Jenkins, and Kubernetes, to automate the deployment and configuration of an application on AWS EC2 instances.
+# DevOps Automation on AWS
+
+This project demonstrates the integration of various DevOps tools and practices, including Terraform, Ansible, Docker, Jenkins, and Kubernetes, to automate the deployment and configuration of an application on AWS EC2 instances. The project showcases Infrastructure as Code (IaC), configuration management, containerization, CI/CD pipelines, and container orchestration, all deployed in an AWS environment.
 
 ## Tools Used
-- **Terraform**: Infrastructure as Code (IaC) tool to provision AWS resources.
-- **Ansible**: Configuration management tool for application deployment.
-- **Docker**: Containerization platform to package the application.
-- **Jenkins**: Continuous Integration and Continuous Deployment (CI/CD) tool to automate the build and deployment process.
-- **Kubernetes (K8s)**: Container orchestration platform to manage and deploy containerized applications.
+- **Terraform**: To provision and manage AWS infrastructure (IaC).
+- **Ansible**: To automate the configuration and application deployment.
+- **Docker**: For containerizing the application.
+- **Jenkins**: For setting up CI/CD pipelines that automate the build, test, and deployment process.
+- **Kubernetes**: To orchestrate containerized applications and manage them across multiple environments (Dev/Prod).
+  
+## Project Structure
+
+The following files and directories are included in the repository:
+
+```bash
+Final_Project/
+├── ansible/
+│   ├── playbook.yml        # Ansible playbook to install Jenkins
+├── kubernetes/
+│   ├── dev-namespace.yml   # Kubernetes namespace for development
+│   ├── prod-namespace.yml  # Kubernetes namespace for production
+│   ├── deployment.yml      # Kubernetes deployment and service definition
+├── terraform/
+│   ├── main.tf             # Terraform script to create AWS infrastructure
+│   ├── variables.tf        # Terraform variable definitions
+│   ├── output.tf           # Output configuration for Terraform
+├── Dockerfile              # Docker configuration for building the app image
+├── Jenkinsfile             # Jenkins pipeline script
+└── README.md               # Project documentation
+```
+
+---
+
 
 ## Step-by-Step Process
 
 ### 1. Infrastructure Creation with Terraform
-**Purpose**: Provision the necessary AWS infrastructure for deploying the application.
+
+**Purpose**: To provision the necessary AWS infrastructure, including a VPC, subnets, and EC2 instances to host the application.
 
 #### a. Create a VPC
-Terraform sets up a Virtual Private Cloud (VPC) with a public subnet to host the EC2 instance.
+
+The Virtual Private Cloud (VPC) is an isolated network within AWS where the infrastructure will be deployed. It is segmented into subnets for better resource management.
+
 ```hcl
 provider "aws" {
   region = "us-west-2"
 }
+
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 }
+
 resource "aws_subnet" "public" {
   vpc_id = aws_vpc.main.id
   cidr_block = "10.0.1.0/24"
 }
+```
 
-    Explanation:
-        The VPC provides an isolated network.
-        The subnet segments the network, enabling efficient resource management.
+- **Explanation**:
+  - The VPC provides an isolated environment.
+  - The subnet segments the network for hosting the EC2 instance.
 
-b. Create an EC2 Instance
+#### b. Provision an EC2 Instance
 
-Provision an EC2 instance within the public subnet, enabling internet access and installing Docker.
+The EC2 instance acts as the application server. A user_data script installs Docker upon instance creation.
 
+```hcl
 resource "aws_instance" "app_server" {
   ami = "ami-0c55b159cbfafe1f0"
   instance_type = "t2.micro"
@@ -50,6 +81,7 @@ resource "aws_instance" "app_server" {
   sudo apt-get install -y docker.io
   EOF
 }
+
 resource "aws_security_group" "allow_http" {
   name = "allow_http"
   description = "Allow HTTP inbound traffic"
@@ -66,15 +98,17 @@ resource "aws_security_group" "allow_http" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+```
 
-    Explanation:
-        The EC2 instance acts as the application server, with a user_data script that installs Docker.
-        The security group allows inbound HTTP traffic, essential for accessing the application.
+- **Explanation**:
+  - The EC2 instance is created in the public subnet with Docker pre-installed.
+  - A security group allows inbound HTTP traffic, ensuring the app can be accessed externally.
 
-c. Create a Kubernetes Cluster
+#### c. Create a Kubernetes Cluster
 
-Utilize EKS (Elastic Kubernetes Service) to create a Kubernetes cluster within the same VPC.
+We utilize Elastic Kubernetes Service (EKS) to create and manage Kubernetes clusters in AWS.
 
+```hcl
 module "eks" {
   source = "terraform-aws-modules/eks/aws"
   cluster_name = "my-cluster"
@@ -82,17 +116,21 @@ module "eks" {
   subnets = [aws_subnet.public.id]
   vpc_id = aws_vpc.main.id
 }
+```
 
-    Explanation:
-        EKS manages Kubernetes clusters on AWS, simplifying the process of creating and managing clusters.
+- **Explanation**:
+  - EKS simplifies the process of deploying Kubernetes clusters, handling the heavy lifting for you.
 
-2. Infrastructure Configuration with Ansible
 
-Purpose: Configure the EC2 instance and deploy the application.
-Install Jenkins
+### 2. Infrastructure Configuration with Ansible
 
-Automate the installation of Jenkins on the EC2 instance using an Ansible playbook.
+**Purpose**: To configure the EC2 instance and deploy Jenkins as part of the CI/CD pipeline.
 
+#### a. Ansible Playbook for Jenkins Installation
+
+Ansible is used to automate the installation of Jenkins on the EC2 instance. The playbook installs Jenkins on the app server.
+
+```yaml
 - hosts: app_server
   become: yes
   tasks:
@@ -100,33 +138,43 @@ Automate the installation of Jenkins on the EC2 instance using an Ansible playbo
       apt:
         name: jenkins
         state: present
+```
+**Explanation**:
+- **hosts**: Targets the 'app_server' group, which should contain the EC2 instance details in the Ansible inventory.
+- **become: yes**: Ensures that the tasks are executed with superuser (root) privileges, necessary for installing system packages.
+- **tasks**: Defines a list of tasks for Ansible to perform.
+    - The task installs Jenkins using the apt package manager on an Ubuntu server.
 
-    Explanation:
-        Ansible playbooks automate server configuration. This playbook installs Jenkins, facilitating CI/CD processes.
+You would also define an inventory file that contains the IP address or hostname of the EC2 instance provisioned by Terraform.
 
-3. Prepare GitHub Repository
 
-Set up a GitHub repository containing the source code for the web project.
-Create Branches
+### 3. Application Code Setup in GitHub
 
-Create two branches: Dev and Prod to separate development and production environments.
-Write a Dockerfile
+The application's code, Dockerfile, and Kubernetes deployment files are stored in a GitHub repository. The repository uses branches to separate development and production environments.
 
-Containerize your web project with the following Dockerfile.
+#### a. Write a Dockerfile
 
+The Dockerfile packages the application into a Docker container.
+
+```Dockerfile
 FROM ubuntu:latest
 RUN apt-get update && apt-get install -y python3
 COPY . /app
 WORKDIR /app
 CMD ["python3", "app.py"]
+```
 
-    Explanation:
-        The Dockerfile defines the application environment, installs Python, and copies the application code into the container.
+- **Explanation**:
+  - The Dockerfile installs Python, copies the application code into the container, and runs the app using Python.
 
-Prepare Kubernetes Deployment Files
 
-Create deployment and service files for Kubernetes.
+#### b. Kubernetes Deployment Files
 
+These files define the Kubernetes deployment and services for both environments (Dev and Prod).
+
+**Deployment File**:
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -147,34 +195,15 @@ spec:
         image: my_app_image
         ports:
         - containerPort: 80
+```
 
-    Explanation:
-        The deployment file defines how the application is deployed in Kubernetes, including replicas and the Docker image to use.
+- **Explanation**:
+  - The deployment file creates 2 replicas of the app container and specifies the Docker image.
 
-4. Kubernetes Configuration
 
-Purpose: Set up the Kubernetes environment with separate namespaces for Dev and Prod.
-Create Namespaces
+**Service File**:
 
-Define two namespaces in your Kubernetes cluster.
-
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: dev
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: prod
-
-    Explanation:
-        Namespaces help separate environments within the same Kubernetes cluster.
-
-Use a Load Balancer
-
-Expose your application externally for both namespaces.
-
+```yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -188,17 +217,41 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 80
+```
 
-    Explanation:
-        The service file defines how to expose the application to the outside world, using a LoadBalancer service type.
+- **Explanation**:
+  - This service file exposes the application to external traffic via a LoadBalancer.
 
-5. CI/CD Pipeline with Jenkins
 
-Purpose: Automate the CI/CD process by configuring Jenkins.
-Create Jenkins Pipelines
+### 4. Kubernetes Configuration
 
-Define pipelines for both the Dev and Prod branches.
+Kubernetes namespaces are used to isolate the Dev and Prod environments. Each namespace manages its own resources, allowing for separation between development and production.
 
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+```
+
+- **Explanation**:
+  - Namespaces create separate environments within the same Kubernetes cluster.
+
+
+### 5. CI/CD Pipeline with Jenkins
+
+**Purpose**: To automate the continuous integration and deployment process using Jenkins pipelines.
+
+#### Jenkins Pipeline Script
+
+The Jenkins pipeline defines stages for provisioning infrastructure, configuring servers, and deploying applications.
+
+```groovy
 pipeline {
   agent any
   stages {
@@ -220,44 +273,37 @@ pipeline {
     }
   }
 }
+```
 
-    Explanation:
-        Jenkins pipelines automate the CI/CD process, applying Terraform configurations, executing Ansible playbooks, and building/running Docker containers.
+- **Explanation**:
+  - The pipeline automates the Terraform, Ansible, and Docker steps, ensuring continuous deployment whenever code changes are pushed to GitHub.
 
-Set Up GitHub Webhook
+#### Webhook Setup
 
-Configure Jenkins to trigger deployments upon push events:
+Jenkins is configured with GitHub webhooks to trigger automatic builds and deployments whenever changes are pushed to the Dev or Prod branches.
 
-    For the Dev branch, deploy to the Dev Kubernetes namespace.
-    For the Prod branch, deploy to the Prod Kubernetes namespace.
+- **Explanation**:
+  - Webhooks enable Jenkins to listen for GitHub events and trigger pipelines automatically, ensuring a smooth CI/CD workflow.
 
-Tricky Points to Note
 
-    Docker in Docker with Ansible: When using Docker in Ansible, ensure the Docker service is running on the EC2 instance. You may need to configure the Ansible playbook to handle Docker networking and permissions properly.
-    Allowing HTTP Traffic in EC2 Security Groups: This is crucial for accessing the application. Without this configuration, external requests will be blocked, preventing users from reaching the application.
-    Passing EC2 Public IP Address to Ansible: Ensure you capture the EC2 instance’s public IP address after provisioning. This address is needed in the Ansible inventory file to target the correct instance.
-    Kubernetes Namespaces: Using namespaces helps in managing different environments (Dev and Prod) within the same cluster, ensuring isolation and resource management.
-    Load Balancer Configuration: Properly configuring the LoadBalancer service type in Kubernetes is essential for exposing the application to external traffic.
+---
 
-GUI Steps
+## Key Commands
 
-Certain configuration steps (e.g., setting up Jenkins, configuring credentials) cannot be captured in the repository. Document these steps clearly:
+- **Terraform**:
+  - `terraform init`: Initializes the Terraform workspace.
+  - `terraform plan`: Previews the infrastructure changes.
+  - `terraform apply`: Deploys the infrastructure changes.
 
-    Jenkins Setup:
-        Install Jenkins on the EC2 instance using the Ansible playbook.
-        Access the Jenkins web UI (http://<EC2_PUBLIC_IP>:8080).
-        Complete the initial setup wizard by installing recommended plugins and configuring an admin user.
-    Credentials Configuration:
-        Store DockerHub and GitHub credentials securely in Jenkins to allow automated deployments.
+- **Ansible**:
+  - `ansible-playbook -i inventory playbook.yml`: Executes the Ansible playbook.
 
-Commands Summary
+- **Docker**:
+  - `docker build -t my_app_image .`: Builds the Docker image.
+  - `docker run -d -p 80:80 my_app_image`: Runs the Docker container.
 
-    Terraform Commands:
-        terraform init: Initialize the Terraform working directory.
-        terraform plan: Create an execution plan.
-        terraform apply: Apply the changes required to reach the desired state.
-    Ansible Commands:
-        ansible-playbook -i inventory playbook.yml: Run the specified Ansible playbook.
-    Docker Commands:
-        docker build -t my_app_image .: Build the Docker image.
-        docker run -d -p 80:80 my_app_image: Run the Docker container.
+---
+
+## GUI Setup for Jenkins
+
+Some setup
