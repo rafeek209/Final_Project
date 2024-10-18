@@ -2,46 +2,42 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'dockerpass' // Update with actual ID
-        GITHUB_CREDENTIALS_ID = 'gitpass' // Update with actual ID
-        DOCKER_IMAGE = "rafeek123/final_project"
-        NAMESPACE = 'dev' // Change to 'prod' for production deployments
+        DOCKERHUB_CREDENTIALS = credentials('dockerpass')
+        KUBECONFIG_CREDENTIALS = credentials('kubeconfig')
+        DOCKER_IMAGE = 'rafeek123/final_project'
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
-                script {
-                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: "${GITHUB_CREDENTIALS_ID}"]]])
-                }
+                git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
-        stage('DockerHub Login') {
+        stage('Build') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    script {
-                        echo "Logging in to DockerHub with user: ${USERNAME}"
-                        sh "echo \$PASSWORD | docker login -u \$USERNAME --password-stdin"
+                script {
+                    def branch = env.BRANCH_NAME
+                    if (branch == 'dev') {
+                        sh 'docker build -t $DOCKER_IMAGE:dev .'
+                    } else if (branch == 'prod') {
+                        sh 'docker build -t $DOCKER_IMAGE:prod .'
                     }
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Push') {
             steps {
                 script {
-                    echo "Building Docker image: ${DOCKER_IMAGE}:dev"
-                    sh "docker build -t ${DOCKER_IMAGE}:dev ."
-                }
-            }
-        }
-
-        stage('Push Docker Image to DockerHub') {
-            steps {
-                script {
-                    echo "Pushing Docker image: ${DOCKER_IMAGE}:dev"
-                    sh "docker push ${DOCKER_IMAGE}:dev"
+                    docker.withRegistry('', DOCKERHUB_CREDENTIALS) {
+                        def branch = env.BRANCH_NAME
+                        if (branch == 'dev') {
+                            sh 'docker push $DOCKER_IMAGE:dev'
+                        } else if (branch == 'prod') {
+                            sh 'docker push $DOCKER_IMAGE:prod'
+                        }
+                    }
                 }
             }
         }
@@ -49,9 +45,14 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    echo "Deploying to Kubernetes namespace: ${NAMESPACE}"
-                    sh "kubectl apply -f k8s_file/deployment-${NAMESPACE}.yaml -n ${NAMESPACE}"
-                    sh "kubectl apply -f k8s_file/service-${NAMESPACE}.yaml -n ${NAMESPACE}"
+                    withCredentials([file(credentialsId: 'kubeconfig-credentials', variable: 'KUBECONFIG')]) {
+                        def branch = env.BRANCH_NAME
+                        if (branch == 'dev') {
+                            sh 'kubectl --kubeconfig=$KUBECONFIG apply -f k8s/dev'
+                        } else if (branch == 'prod') {
+                            sh 'kubectl --kubeconfig=$KUBECONFIG apply -f k8s/prod'
+                        }
+                    }
                 }
             }
         }
@@ -59,16 +60,7 @@ pipeline {
 
     post {
         always {
-            script {
-                echo "Cleaning up..."
-                sh "docker system prune -f"
-            }
-        }
-        success {
-            echo "Build completed successfully!"
-        }
-        failure {
-            echo "Build failed."
+            cleanWs()
         }
     }
 }
