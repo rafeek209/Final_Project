@@ -1,37 +1,66 @@
-- hosts: ec2
+---
+- name: Install Jenkins on Ubuntu Server
+  hosts: webservers
   become: yes
   tasks:
-    - name: Update apt packages
+    - name: Update and upgrade apt packages
       apt:
         update_cache: yes
+        upgrade: dist
 
-    - name: Install Java (Jenkins requires Java)
+    - name: Install dependencies for Docker
       apt:
-        name: openjdk-11-jdk
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
         state: present
 
-    - name: Add Jenkins repository key to the system
+    - name: Add Docker's official GPG key
       apt_key:
-        url: https://pkg.jenkins.io/debian/jenkins.io.key
+        url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    - name: Add Jenkins repository
+    - name: Determine Ubuntu version codename
+      command: lsb_release -cs
+      register: ubuntu_codename
+
+    - name: Add Docker APT repository
       apt_repository:
-        repo: 'deb http://pkg.jenkins.io/debian-stable binary/'
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ubuntu_codename.stdout }} stable"
         state: present
 
-    - name: Install Jenkins
+    - name: Install Docker
       apt:
-        name: jenkins
+        name: docker-ce
         state: present
 
-    - name: Start Jenkins service
-      systemd:
-        name: jenkins
-        state: started
-        enabled: true
+    - name: Pull Jenkins Docker image
+      docker_image:
+        name: jenkins/jenkins
+        tag: lts
+        source: pull
 
-    - name: Ensure Jenkins is running
-      systemd:
+    - name: Run Jenkins container
+      docker_container:
         name: jenkins
+        image: jenkins/jenkins:lts
         state: started
+        restart_policy: always
+        published_ports:
+          - "8080:8080"
+
+    - name: Wait for Jenkins to start
+      wait_for:
+        port: 8080
+        delay: 10
+        timeout: 60
+
+    - name: Get Jenkins initial password
+      command: "docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword"
+      register: jenkins_password
+
+    - name: Print Jenkins initial password
+      debug:
+        msg: "Jenkins initial admin password is: {{ jenkins_password.stdout }}"
