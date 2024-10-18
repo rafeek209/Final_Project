@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'your-docker-credentials-id' // Replace with your DockerHub credentials ID
-        GITHUB_CREDENTIALS_ID = 'your-github-credentials-id' // Replace with your GitHub credentials ID
+        DOCKER_CREDENTIALS_ID = 'dockerpass' // Update with actual ID
+        GITHUB_CREDENTIALS_ID = 'gitpass' // Update with actual ID
         DOCKER_IMAGE = "rafeek123/final_project"
         NAMESPACE = 'dev' // Change to 'prod' for production deployments
     }
@@ -50,7 +50,6 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to Kubernetes namespace: ${NAMESPACE}"
-                    // Apply deployment and service files for the dev environment
                     sh "kubectl apply -f k8s_file/deployment-${NAMESPACE}.yaml -n ${NAMESPACE}"
                     sh "kubectl apply -f k8s_file/service-${NAMESPACE}.yaml -n ${NAMESPACE}"
                 }
