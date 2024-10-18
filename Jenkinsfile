@@ -47,21 +47,21 @@ pipeline {
             }
         }
 
-    stage('Deploy to Kubernetes') {
-        steps {
-            script {
-              def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
-            
-                withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
-                sh """
-                kubectl apply -f k8s_files/${namespace}_deployment.yml -n ${namespace}
-                kubectl apply -f k8s_files/${namespace}_service.yml -n ${namespace}
-                """
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
+                    withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
+                        sh """
+                        kubectl apply -f k8s_files/${namespace}_deployment.yml -n ${namespace}
+                        kubectl apply -f k8s_files/${namespace}_service.yml -n ${namespace}
+                        """
+                    }
                 }
             }
         }
     }
-    
+
     post {
         always {
             cleanWs()
