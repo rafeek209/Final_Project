@@ -2,9 +2,9 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_CREDENTIALS = credentials('dockerhub-credentials') // Replace with your DockerHub credentials ID
+        DOCKER_CREDENTIALS = credentials('dockerpass')
         GIT_URL = 'https://github.com/rafeek209/Final_Project.git'
-        IMAGE_NAME = 'rafeek123/final_project' // Change to your desired Docker image name
+        IMAGE_NAME = 'rafeek123/final_project'
     }
 
     stages {
@@ -46,8 +46,7 @@ pipeline {
             steps {
                 script {
                     echo "Deploying to Kubernetes"
-                    // Add your kubectl commands here, e.g., apply a deployment
-                    sh "kubectl apply -f k8s/deployment.yaml" // Adjust the path to your deployment YAML file
+                    sh "kubectl apply -f k8s/deployment.yaml"
                 }
             }
         }
