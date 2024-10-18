@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'lachlanevenson/k8s-helm:latest'
+            args '-u root:root'
+        }
+    }
 
     environment {
         DOCKER_HUB_REPO = 'rafeek123/final_project'
