@@ -1,55 +1,43 @@
 pipeline {
     agent any
 
+    environment {
+        KUBECONFIG = '/home/crazy/kubeconfig' // Set your kubeconfig path
+    }
+
     stages {
-        stage('DockerHub Login') {
+        stage('Checkout Code') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerpass', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    sh '''
-                        echo "Logging in to DockerHub with user: $USERNAME"
-                        echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
-                    '''
-                }
+                // Checkout your code from Git
+                git 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
+                // Build your Docker image
                 script {
-                    def branch = env.BRANCH_NAME
-                    def imageName = "rafeek123/final_project:${branch == 'main' ? 'prod' : 'dev'}"
-                    echo "Building Docker image: $imageName"
-                    sh "docker build -t ${imageName} ."
+                    sh 'docker build -t rafeek123/final_project:dev .'
                 }
             }
         }
 
         stage('Push Docker Image to DockerHub') {
             steps {
+                // Push the Docker image to DockerHub
                 script {
-                    def branch = env.BRANCH_NAME
-                    def imageName = "rafeek123/final_project:${branch == 'main' ? 'prod' : 'dev'}"
-                    echo "Pushing Docker image: $imageName"
-                    sh "docker push ${imageName}"
+                    sh 'docker push rafeek123/final_project:dev'
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
-            agent {
-                docker {
-                    image 'bitnami/kubectl:latest'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Optional: Mount Docker socket if needed
-                }
-            }
             steps {
                 script {
-                    def branch = env.BRANCH_NAME
-                    def namespace = branch == 'main' ? 'prod' : 'dev'
-                    echo "Deploying to Kubernetes namespace: $namespace"
+                    // Deploy the application to Kubernetes
                     sh '''
-                        kubectl apply -f k8s_file/deployment-${namespace}.yaml
-                        kubectl apply -f k8s_file/service-${namespace}.yaml
+                        kubectl apply -f k8s_file/deployment-dev.yaml
+                        kubectl apply -f k8s_file/service-dev.yaml
                     '''
                 }
             }
@@ -57,12 +45,11 @@ pipeline {
     }
 
     post {
-        always {
-            echo "Cleaning up..."
-            sh '''
-                docker system prune -f
-            '''
-            echo "Build completed: ${env.BUILD_ID}"
+        success {
+            echo 'Deployment successful!'
+        }
+        failure {
+            echo 'Deployment failed!'
         }
     }
 }
