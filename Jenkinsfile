@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-            image 'lachlanevenson/k8s-helm:latest'
-            args '-u root:root'
+            image 'bitnami/kubectl:latest' // Updated Docker image
+            args '-u root:root' // Keep if necessary
         }
     }
 
@@ -39,7 +39,6 @@ pipeline {
                 script {
                     echo "Checking out the main branch."
                 }
-                // Always checks out the main branch
                 git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
@@ -67,8 +66,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Always deploy to the production namespace
-                    def namespace = KUBE_NAMESPACE_PROD // Change to PRODUCTION by default
+                    def namespace = KUBE_NAMESPACE_PROD // Default to PRODUCTION
                     withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
                         sh """
                         kubectl apply -f k8s_file/deployment-prod.yaml -n ${namespace}
