@@ -23,7 +23,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: "${env.GIT_BRANCH}", url: 'https://github.com/rafeek209/Final_Project.git'
+                git branch: "main", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
