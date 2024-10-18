@@ -23,7 +23,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: "main", url: 'https://github.com/rafeek209/Final_Project.git'
+                git branch: "${env.GIT_BRANCH}", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
@@ -47,26 +47,21 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-    steps {
-        script {
-            def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
+    stage('Deploy to Kubernetes') {
+        steps {
+            script {
+              def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
             
-            def deploymentFile = (env.GIT_BRANCH == 'dev') ? 'k8s_files/dev_deployment.yml' : 'k8s_files/prod_deployment.yml'
-            def serviceFile = (env.GIT_BRANCH == 'dev') ? 'k8s_files/dev_service.yml' : 'k8s_files/prod_service.yml'
-
-            withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
+                withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
                 sh """
-                kubectl apply -f ${deploymentFile} -n ${namespace}
-                kubectl apply -f ${serviceFile} -n ${namespace}
+                kubectl apply -f k8s_files/${namespace}_deployment.yml -n ${namespace}
+                kubectl apply -f k8s_files/${namespace}_service.yml -n ${namespace}
                 """
+                }
             }
         }
     }
-}
-
-    }
-
+    
     post {
         always {
             cleanWs()
