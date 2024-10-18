@@ -32,9 +32,9 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    echo "Attempting to checkout branch: main"
+                    echo "Checking out the main branch."
                 }
-                // Ensure the pipeline always checks out the main branch
+                // Always checks out the main branch
                 git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
@@ -62,11 +62,12 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
+                    // Always deploy to the production namespace
+                    def namespace = KUBE_NAMESPACE_PROD // Change to PRODUCTION by default
                     withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
                         sh """
-                        kubectl apply -f k8s_file/${namespace}_deployment.yaml -n ${namespace}
-                        kubectl apply -f k8s_file/${namespace}_service.yaml -n ${namespace}
+                        kubectl apply -f k8s_file/deployment-prod.yaml -n ${namespace}
+                        kubectl apply -f k8s_file/service-prod.yaml -n ${namespace}
                         """
                     }
                 }
