@@ -1,16 +1,13 @@
 pipeline {
     agent any
-    environment {
-        DOCKER_IMAGE = "rafeek123/final_project:${env.BRANCH_NAME}"
-    }
     stages {
         stage('DockerHub Login') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerpass', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    sh '''
-                        echo "Logging in to DockerHub with user: $USERNAME"
-                        echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
-                    '''
+                    script {
+                        echo "Logging in to DockerHub with user: ${USERNAME}"
+                        sh "echo '${PASSWORD}' | docker login -u '${USERNAME}' --password-stdin"
+                    }
                 }
             }
         }
@@ -18,19 +15,12 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == 'dev') {
-                        checkout scm: [
-                            $class: 'GitSCM',
-                            branches: [[name: '*/dev']],
-                            userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: 'github-credentials']]
-                        ]
-                    } else if (env.BRANCH_NAME == 'prod') {
-                        checkout scm: [
-                            $class: 'GitSCM',
-                            branches: [[name: '*/prod']],
-                            userRemoteConfigs: [[url: 'https://github.com/rafeek209/Final_Project.git', credentialsId: 'github-credentials']]
-                        ]
-                    }
+                    def branchName = env.BRANCH_NAME
+                    checkout scm: [
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branchName}"]],
+                        userRemoteConfigs: [[url: 'https://github.com/yourusername/your-repo.git', credentialsId: 'github-credentials']]
+                    ]
                 }
             }
         }
@@ -45,8 +35,8 @@ pipeline {
             }
             steps {
                 script {
-                    // Build the Docker image and assign it to a variable
-                    def app = docker.build(DOCKER_IMAGE)
+                    // Define app globally for usage in later stages
+                    app = docker.build("rafeek123/final_project:${env.BRANCH_NAME}-${env.BUILD_NUMBER}")
                 }
             }
         }
@@ -55,7 +45,6 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerpass') {
-                        // Use the global DOCKER_IMAGE variable here
                         app.push()
                     }
                 }
