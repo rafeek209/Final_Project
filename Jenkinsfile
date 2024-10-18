@@ -1,48 +1,34 @@
 pipeline {
     agent any
-
+    
     environment {
-        DOCKER_HUB_REPO = 'rafeek123/final_project'
-        KUBECONFIG_CRED_ID = 'kubeconfig'
-        DOCKER_CRED_ID = 'dockerpass'
-        KUBE_NAMESPACE_DEV = 'dev'
-        KUBE_NAMESPACE_PROD = 'prod'
+        DOCKER_CREDENTIALS = credentials('dockerhub-credentials') // Replace with your DockerHub credentials ID
+        GIT_URL = 'https://github.com/rafeek209/Final_Project.git'
+        IMAGE_NAME = 'rafeek123/final_project' // Change to your desired Docker image name
     }
 
     stages {
+        stage('Checkout SCM') {
+            steps {
+                echo "Checking out the main branch from Git"
+                git branch: 'main', url: GIT_URL
+            }
+        }
+
         stage('DockerHub Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CRED_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                    sh '''
-                        echo "Logging in to DockerHub with user: $USERNAME"
-                        echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin
-                    '''
-                }
-            }
-        }
-
-        stage('Log Branch Name') {
-            steps {
                 script {
-                    echo "Current GIT_BRANCH: ${env.GIT_BRANCH ?: 'main'}"
+                    echo "Logging in to DockerHub with user: ${DOCKER_CREDENTIALS.username}"
+                    sh "echo '${DOCKER_CREDENTIALS.password}' | docker login -u '${DOCKER_CREDENTIALS.username}' --password-stdin"
                 }
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                script {
-                    echo "Attempting to checkout branch: ${env.GIT_BRANCH ?: 'main'}"
-                }
-                git branch: "${env.GIT_BRANCH ?: 'main'}", url: 'https://github.com/rafeek209/Final_Project.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def appName = "${DOCKER_HUB_REPO}:${env.GIT_COMMIT}"
-                    docker.build(appName)
+                    echo "Building Docker image: ${IMAGE_NAME}"
+                    sh "docker build -t ${IMAGE_NAME}:latest ."
                 }
             }
         }
@@ -50,10 +36,8 @@ pipeline {
         stage('Push Docker Image to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CRED_ID}") {
-                        def appImage = docker.image("${DOCKER_HUB_REPO}:${env.GIT_COMMIT}")
-                        appImage.push()
-                    }
+                    echo "Pushing Docker image to DockerHub"
+                    sh "docker push ${IMAGE_NAME}:latest"
                 }
             }
         }
@@ -61,13 +45,9 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def namespace = (env.GIT_BRANCH == 'dev') ? "${KUBE_NAMESPACE_DEV}" : "${KUBE_NAMESPACE_PROD}"
-                    withKubeConfig([credentialsId: "${KUBECONFIG_CRED_ID}"]) {
-                        sh """
-                        kubectl apply -f k8s_files/${namespace}_deployment.yml -n ${namespace}
-                        kubectl apply -f k8s_files/${namespace}_service.yml -n ${namespace}
-                        """
-                    }
+                    echo "Deploying to Kubernetes"
+                    // Add your kubectl commands here, e.g., apply a deployment
+                    sh "kubectl apply -f k8s/deployment.yaml" // Adjust the path to your deployment YAML file
                 }
             }
         }
@@ -75,6 +55,7 @@ pipeline {
 
     post {
         always {
+            echo 'Cleaning up the workspace'
             cleanWs()
         }
     }
