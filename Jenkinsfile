@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'docker:latest'
+            args '--privileged'
+        }
+    }
 
     environment {
         DOCKER_CREDENTIALS_ID = 'dockerpass'
@@ -38,10 +43,10 @@ pipeline {
             steps {
                 script {
                     sh 'mkdir -p ~/.kube'
-                    sh 'cp ${KUBECONFIG_PATH} ~/.kube/config'
-                    
+                    sh "cp ${KUBECONFIG_PATH} ~/.kube/config"
+
                     sh 'export KUBECONFIG=~/.kube/config'
-                    
+
                     sh 'kubectl apply -f k8s_file/deployment-dev.yaml --namespace=dev'
                     sh 'kubectl apply -f k8s_file/service-dev.yaml --namespace=dev'
                 }
