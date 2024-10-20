@@ -16,6 +16,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    // Check if Docker is available before proceeding
+                    sh 'docker --version'
                     dockerImage = docker.build("rafeek123/final_project:${env.BUILD_NUMBER}")
                 }
             }
