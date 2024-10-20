@@ -1,64 +1,43 @@
 pipeline {
     agent {
         docker {
-            image 'docker:latest' // Use an official Docker image
-            args '-v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket
+            image 'your-docker-image:latest'  // Replace with your Docker image
+            args '-u root:root'                // Adjust user permissions if necessary
         }
     }
-    
-    environment {
-        DOCKER_CREDENTIALS_ID = 'dockerpass'
-        KUBECONFIG_PATH = 'kubeconfig'
-    }
-    
     stages {
-        stage('Clone Repository') {
+        stage('Build') {
             steps {
-                git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
+                echo 'Building...'
+                // Add your build commands here, for example:
+                sh 'make' // Replace with your build command
             }
         }
-
-        stage('Debug Docker') {
+        stage('Test') {
             steps {
-                script {
-                    sh 'echo $DOCKER_CREDENTIALS_ID' // Check if the variable is set
-                    sh 'docker --version' // Check if Docker is accessible
-                    sh 'docker info' // Get Docker info
-                }
+                echo 'Testing...'
+                // Add your test commands here, for example:
+                sh 'make test' // Replace with your test command
             }
         }
-
-        stage('Build Docker Image') {
+        stage('Deploy') {
             steps {
-                script {
-                    dockerImage = docker.build("rafeek123/final_project:${env.BUILD_NUMBER}")
-                }
+                echo 'Deploying...'
+                // Add your deployment commands here, for example:
+                sh 'make deploy' // Replace with your deployment command
             }
         }
-
-        stage('Push Docker Image to Docker Hub') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
-                        dockerImage.push('latest')
-                        dockerImage.push("${env.BUILD_NUMBER}")
-                    }
-                }
-            }
+    }
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
         }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    sh 'mkdir -p ~/.kube'
-                    sh 'cp ${KUBECONFIG_PATH} ~/.kube/config'
-                    
-                    sh 'export KUBECONFIG=~/.kube/config'
-                    
-                    sh 'kubectl apply -f k8s_file/deployment-dev.yaml --namespace=dev'
-                    sh 'kubectl apply -f k8s_file/service-dev.yaml --namespace=dev'
-                }
-            }
+        failure {
+            echo 'Pipeline failed.'
+        }
+        always {
+            echo 'Cleaning up...'
+            // Add cleanup commands if necessary
         }
     }
 }
