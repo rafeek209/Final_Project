@@ -5,6 +5,7 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'dockerpass'
         KUBECONFIG_PATH = 'kubeconfig'
     }
+
     
     stages {
         stage('Clone Repository') {
