@@ -1,57 +1,64 @@
 pipeline {
-    agent any
-
-    environment {
-        DOCKER_HUB_REPO = 'rafeek123/final_project'
-        DOCKER_HUB_CREDENTIALS = 'dockerpass'
-        KUBECONFIG = 'kubeconfig'
-        KUBE_NAMESPACE = 'dev'
+    agent {
+        docker {
+            image 'docker:latest' // Use an official Docker image
+            args '-v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket
+        }
     }
-
+    
+    environment {
+        DOCKER_CREDENTIALS_ID = 'dockerpass'
+        KUBECONFIG_PATH = 'kubeconfig'
+    }
+    
     stages {
-        stage('Checkout Code') {
+        stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
+            }
+        }
+
+        stage('Debug Docker') {
+            steps {
+                script {
+                    sh 'echo $DOCKER_CREDENTIALS_ID' // Check if the variable is set
+                    sh 'docker --version' // Check if Docker is accessible
+                    sh 'docker info' // Get Docker info
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageTag = "${env.BUILD_NUMBER}"
-                    sh "docker build -t ${DOCKER_HUB_REPO}:${imageTag} ."
+                    dockerImage = docker.build("rafeek123/final_project:${env.BUILD_NUMBER}")
                 }
             }
         }
 
-        stage('Push Docker Image to DockerHub') {
+        stage('Push Docker Image to Docker Hub') {
             steps {
                 script {
-                    def imageTag = "${env.BUILD_NUMBER}"
-                    withCredentials([usernamePassword(credentialsId: DOCKER_HUB_CREDENTIALS, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
-                        sh "docker push ${DOCKER_HUB_REPO}:${imageTag}"
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
+                        dockerImage.push('latest')
+                        dockerImage.push("${env.BUILD_NUMBER}")
                     }
                 }
             }
         }
 
-        stage('Deploy to Kubernetes Dev Namespace') {
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh "kubectl apply -f k8s_file/deployment-dev.yaml --namespace=${KUBE_NAMESPACE}"
-                    sh "kubectl apply -f k8s_file/service-dev.yaml --namespace=${KUBE_NAMESPACE}"
+                    sh 'mkdir -p ~/.kube'
+                    sh 'cp ${KUBECONFIG_PATH} ~/.kube/config'
+                    
+                    sh 'export KUBECONFIG=~/.kube/config'
+                    
+                    sh 'kubectl apply -f k8s_file/deployment-dev.yaml --namespace=dev'
+                    sh 'kubectl apply -f k8s_file/service-dev.yaml --namespace=dev'
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment to dev namespace was successful!'
-        }
-        failure {
-            echo 'Deployment failed.'
         }
     }
 }
