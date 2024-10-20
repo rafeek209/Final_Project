@@ -1,18 +1,15 @@
 pipeline {
-    agent {
-        docker {
-            image 'docker:latest'
-            args '--privileged'
-        }
-    }
+    agent any
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'dockerpass'
-        KUBECONFIG_PATH = 'kubeconfig'
+        DOCKER_HUB_REPO = 'rafeek123/final_project'
+        DOCKER_HUB_CREDENTIALS = 'dockerpass'
+        KUBECONFIG = 'kubeconfig'
+        KUBE_NAMESPACE = 'dev'
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/rafeek209/Final_Project.git'
             }
@@ -21,36 +18,40 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Check if Docker is available before proceeding
-                    sh 'docker --version'
-                    dockerImage = docker.build("rafeek123/final_project:${env.BUILD_NUMBER}")
+                    def imageTag = "${env.BUILD_NUMBER}"
+                    sh "docker build -t ${DOCKER_HUB_REPO}:${imageTag} ."
                 }
             }
         }
 
-        stage('Push Docker Image to Docker Hub') {
+        stage('Push Docker Image to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
-                        dockerImage.push('latest')
-                        dockerImage.push("${env.BUILD_NUMBER}")
+                    def imageTag = "${env.BUILD_NUMBER}"
+                    withCredentials([usernamePassword(credentialsId: DOCKER_HUB_CREDENTIALS, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                        sh "docker push ${DOCKER_HUB_REPO}:${imageTag}"
                     }
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes Dev Namespace') {
             steps {
                 script {
-                    sh 'mkdir -p ~/.kube'
-                    sh "cp ${KUBECONFIG_PATH} ~/.kube/config"
-
-                    sh 'export KUBECONFIG=~/.kube/config'
-
-                    sh 'kubectl apply -f k8s_file/deployment-dev.yaml --namespace=dev'
-                    sh 'kubectl apply -f k8s_file/service-dev.yaml --namespace=dev'
+                    sh "kubectl apply -f k8s_file/deployment-dev.yaml --namespace=${KUBE_NAMESPACE}"
+                    sh "kubectl apply -f k8s_file/service-dev.yaml --namespace=${KUBE_NAMESPACE}"
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment to dev namespace was successful!'
+        }
+        failure {
+            echo 'Deployment failed.'
         }
     }
 }
